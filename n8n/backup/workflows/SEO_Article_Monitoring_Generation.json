@@ -1,0 +1,779 @@
+{
+  "name": "SEO Article Monitoring & Generation System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "amount": 7
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Weekly SEO Analysis",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1000,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "searchanalytics.query",
+        "siteUrl": "={{ $json.site1_url || 'https://site1.com' }}",
+        "startDate": "={{ new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0] }}",
+        "endDate": "={{ new Date().toISOString().split('T')[0] }}",
+        "dimensions": [
+          "query",
+          "page"
+        ],
+        "rowLimit": 100,
+        "options": {}
+      },
+      "id": "google-search-console-site1",
+      "name": "Google Search Console - Site 1",
+      "type": "@n8n/n8n-nodes-langchain.googleSearchConsole",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        -400
+      ],
+      "credentials": {
+        "googleSearchConsoleOAuth2Api": {
+          "id": "gsc-cred-site1",
+          "name": "Google Search Console Site 1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "searchanalytics.query",
+        "siteUrl": "={{ $json.site2_url || 'https://site2.com' }}",
+        "startDate": "={{ new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0] }}",
+        "endDate": "={{ new Date().toISOString().split('T')[0] }}",
+        "dimensions": [
+          "query",
+          "page"
+        ],
+        "rowLimit": 100,
+        "options": {}
+      },
+      "id": "google-search-console-site2",
+      "name": "Google Search Console - Site 2",
+      "type": "@n8n/n8n-nodes-langchain.googleSearchConsole",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        0
+      ],
+      "credentials": {
+        "googleSearchConsoleOAuth2Api": {
+          "id": "gsc-cred-site2",
+          "name": "Google Search Console Site 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "propertyId": "={{ $json.ga4_property_site1 || 'GA4_PROPERTY_ID_1' }}",
+        "resource": {
+          "name": "runReport",
+          "options": {
+            "dateRanges": [
+              {
+                "startDate": "30daysAgo",
+                "endDate": "yesterday"
+              }
+            ],
+            "dimensions": [
+              {
+                "name": "pagePath"
+              },
+              {
+                "name": "sessionDefaultChannelGrouping"
+              }
+            ],
+            "metrics": [
+              {
+                "name": "sessions"
+              },
+              {
+                "name": "totalUsers"
+              },
+              {
+                "name": "screenPageViews"
+              }
+            ]
+          }
+        }
+      },
+      "id": "google-analytics-site1",
+      "name": "Google Analytics - Site 1",
+      "type": "@n8n/n8n-nodes-langchain.googleAnalytics4",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        -200
+      ],
+      "credentials": {
+        "googleAnalyticsOAuth2Api": {
+          "id": "ga4-cred-site1",
+          "name": "Google Analytics Site 1"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "propertyId": "={{ $json.ga4_property_site2 || 'GA4_PROPERTY_ID_2' }}",
+        "resource": {
+          "name": "runReport",
+          "options": {
+            "dateRanges": [
+              {
+                "startDate": "30daysAgo",
+                "endDate": "yesterday"
+              }
+            ],
+            "dimensions": [
+              {
+                "name": "pagePath"
+              },
+              {
+                "name": "sessionDefaultChannelGrouping"
+              }
+            ],
+            "metrics": [
+              {
+                "name": "sessions"
+              },
+              {
+                "name": "totalUsers"
+              },
+              {
+                "name": "screenPageViews"
+              }
+            ]
+          }
+        }
+      },
+      "id": "google-analytics-site2",
+      "name": "Google Analytics - Site 2",
+      "type": "@n8n/n8n-nodes-langchain.googleAnalytics4",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        200
+      ],
+      "credentials": {
+        "googleAnalyticsOAuth2Api": {
+          "id": "ga4-cred-site2",
+          "name": "Google Analytics Site 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "site1-data",
+              "name": "site1_data",
+              "value": "={{ { gsc: $('Google Search Console - Site 1').first(), ga: $('Google Analytics - Site 1').first() } }}",
+              "type": "object"
+            },
+            {
+              "id": "site2-data",
+              "name": "site2_data",
+              "value": "={{ { gsc: $('Google Search Console - Site 2').first(), ga: $('Google Analytics - Site 2').first() } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "combine-site-data",
+      "name": "Combine Site Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "qwen2.5:14b-8k",
+          "mode": "list",
+          "cachedResultName": "qwen2.5:14b-8k"
+        },
+        "prompt": "={{ `Analyze the SEO data for two websites and generate article ideas:
+
+Site 1 Search Console Data:
+${JSON.stringify($json.site1_data.gsc, null, 2)}
+
+Site 1 Analytics Data:
+${JSON.stringify($json.site1_data.ga, null, 2)}
+
+Site 2 Search Console Data:
+${JSON.stringify($json.site2_data.gsc, null, 2)}
+
+Site 2 Analytics Data:
+${JSON.stringify($json.site2_data.ga, null, 2)}
+
+Based on this data, identify:
+1. High-performing keywords that are ranking well
+2. Pages with good traffic but poor rankings
+3. Content gaps (keywords with search volume but no content)
+4. Trending topics from search queries
+
+Generate 4-6 article ideas that would help improve SEO for these sites. For each article idea, include:
+- Title
+- Target keywords
+- Why this topic would perform well
+- Content outline (3-5 main sections)
+
+Format your response as a JSON array of article objects.` }}",
+        "options": {}
+      },
+      "id": "seo-analysis-ai",
+      "name": "SEO Analysis & Article Ideas",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -200,
+        -200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "yjDbkWOXNXC959ei",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "moveBinaryData",
+        "options": {}
+      },
+      "id": "parse-article-ideas",
+      "name": "Parse Article Ideas",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "generate_articles",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "split-articles",
+      "name": "Split Into Individual Articles",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "qwen2.5:14b-8k",
+          "mode": "list",
+          "cachedResultName": "qwen2.5:14b-8k"
+        },
+        "prompt": "={{ `Write a comprehensive SEO-optimized article based on this idea:
+
+${JSON.stringify($json, null, 2)}
+
+Requirements:
+- Write in engaging, natural language
+- Include the target keywords naturally in the content
+- Structure with proper headings (H1, H2, H3)
+- Add internal and external links where appropriate
+- Include meta description suggestion
+- Make it 1500-2500 words long
+- Optimize for both search engines and readers
+- Include a compelling introduction and conclusion
+
+Return the article in this JSON format:
+{
+  "title": "Article Title",
+  "meta_description": "Meta description under 160 characters",
+  "content": "Full HTML content with proper headings",
+  "target_keywords": ["keyword1", "keyword2"],
+  "estimated_reading_time": "5 min read",
+  "categories": ["SEO Category 1", "SEO Category 2"]
+}` }}",
+        "options": {}
+      },
+      "id": "generate-article-content",
+      "name": "Generate Article Content",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        -200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "yjDbkWOXNXC959ei",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ Math.random() }}",
+                    "rightValue": 0.5,
+                    "operator": {
+                      "type": "number",
+                      "operation": "larger"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": 1
+        }
+      },
+      "id": "distribute-to-sites",
+      "name": "Distribute Articles to Sites",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        600,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.site1_wordpress_url || 'https://site1.hostinger.com/wp-json/wp/v2/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Basic {{ Buffer.from($json.site1_wp_username + ':' + $json.site1_wp_password).toString('base64') }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "content",
+              "value": "={{ $json.content }}"
+            },
+            {
+              "name": "excerpt",
+              "value": "={{ $json.meta_description }}"
+            },
+            {
+              "name": "status",
+              "value": "draft"
+            },
+            {
+              "name": "categories",
+              "value": "={{ $json.categories.join(',') }}"
+            },
+            {
+              "name": "meta",
+              "value": "={{ { '_yoast_wpseo_metadesc': $json.meta_description, '_yoast_wpseo_focuskw': $json.target_keywords[0] } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "post-to-wordpress-site1",
+      "name": "Post to WordPress Site 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.site2_wordpress_url || 'https://site2.hostinger.com/wp-json/wp/v2/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Basic {{ Buffer.from($json.site2_wp_username + ':' + $json.site2_wp_password).toString('base64') }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "content",
+              "value": "={{ $json.content }}"
+            },
+            {
+              "name": "excerpt",
+              "value": "={{ $json.meta_description }}"
+            },
+            {
+              "name": "status",
+              "value": "draft"
+            },
+            {
+              "name": "categories",
+              "value": "={{ $json.categories.join(',') }}"
+            },
+            {
+              "name": "meta",
+              "value": "={{ { '_yoast_wpseo_metadesc': $json.meta_description, '_yoast_wpseo_focuskw': $json.target_keywords[0] } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "post-to-wordpress-site2",
+      "name": "Post to WordPress Site 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## SEO Article Generation System\n\n**Weekly automated SEO content creation workflow**\n\nThis system:\n- Monitors Google Search Console and Analytics data\n- Identifies SEO opportunities and content gaps\n- Generates high-quality, SEO-optimized articles\n- Publishes to WordPress sites hosted on Hostinger\n\n**Last run:** {{ new Date().toISOString() }}\n\n**Articles generated:** {{ $('Split Into Individual Articles').context.itemCount || 0 }}",
+        "height": 400,
+        "width": 600,
+        "color": 2
+      },
+      "id": "workflow-description",
+      "name": "Workflow Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        -600
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Configuration Required\n\n**Google APIs:**\n- Set up Google Search Console OAuth2 credentials for both sites\n- Set up Google Analytics 4 OAuth2 credentials for both sites\n\n**WordPress:**\n- Configure WordPress REST API credentials for both sites\n- Ensure Yoast SEO plugin is installed for meta handling\n\n**Variables needed:**\n- site1_url, site2_url (Search Console site URLs)\n- ga4_property_site1, ga4_property_site2 (GA4 property IDs)\n- site1_wordpress_url, site2_wordpress_url\n- site1_wp_username, site1_wp_password\n- site2_wp_username, site2_wp_password",
+        "height": 350,
+        "width": 500,
+        "color": 6
+      },
+      "id": "setup-notes",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "boolean": [
+            {
+              "name": "success",
+              "value": "={{ $json.statusCode === 201 || $json.statusCode === 200 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-post-success",
+      "name": "Check Post Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1000,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "to": "={{ $json.notification_email || 'admin@example.com' }}",
+        "subject": "SEO Articles Generated - {{ new Date().toLocaleDateString() }}",
+        "body": "={{ `Weekly SEO article generation completed successfully!
+
+Articles Generated: ${$('Split Into Individual Articles').context.itemCount || 0}
+Site 1: ${$('Post to WordPress Site 1').isExecuted ? '✓' : '✗'}
+Site 2: ${$('Post to WordPress Site 2').isExecuted ? '✓' : '✗'}
+
+Please review the draft articles in WordPress admin and publish when ready.
+
+Generated at: ${new Date().toISOString()}` }}",
+        "options": {}
+      },
+      "id": "send-notification",
+      "name": "Send Notification Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        -200
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "email-cred",
+          "name": "SMTP Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly SEO Analysis": {
+      "main": [
+        [
+          {
+            "node": "Google Search Console - Site 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Search Console - Site 2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Analytics - Site 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Analytics - Site 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Search Console - Site 1": {
+      "main": [
+        [
+          {
+            "node": "Combine Site Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Search Console - Site 2": {
+      "main": [
+        [
+          {
+            "node": "Combine Site Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Analytics - Site 1": {
+      "main": [
+        [
+          {
+            "node": "Combine Site Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Analytics - Site 2": {
+      "main": [
+        [
+          {
+            "node": "Combine Site Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Site Data": {
+      "main": [
+        [
+          {
+            "node": "SEO Analysis & Article Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SEO Analysis & Article Ideas": {
+      "main": [
+        [
+          {
+            "node": "Parse Article Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Article Ideas": {
+      "main": [
+        [
+          {
+            "node": "Split Into Individual Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Individual Articles": {
+      "main": [
+        [
+          {
+            "node": "Generate Article Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Article Content": {
+      "main": [
+        [
+          {
+            "node": "Distribute Articles to Sites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distribute Articles to Sites": {
+      "main": [
+        [
+          {
+            "node": "Post to WordPress Site 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post to WordPress Site 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to WordPress Site 1": {
+      "main": [
+        [
+          {
+            "node": "Check Post Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to WordPress Site 2": {
+      "main": [
+        [
+          {
+            "node": "Check Post Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Post Success": {
+      "main": [
+        [
+          {
+            "node": "Send Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "seo-workflow-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "seo-article-generator-workflow"
+  },
+  "id": "SEO-Article-Generator",
+  "tags": [
+    "seo",
+    "content-generation",
+    "wordpress",
+    "google-analytics",
+    "google-search-console"
+  ]
+}
