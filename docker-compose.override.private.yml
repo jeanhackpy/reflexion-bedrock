@@ -39,7 +39,7 @@ services:
 
   postgres:
     ports:
-      - 127.0.0.1:5433:5432                
+      - 127.0.0.1:5433:5432
 
   redis:
     ports:
@@ -56,7 +56,7 @@ services:
   ollama-gpu:
     ports:
       - 127.0.0.1:11434:11434
-      
+
   ollama-gpu-amd:
     ports:
       - 127.0.0.1:11434:11434

@@ -1,0 +1,40 @@
+{
+  "agents": {
+    "defaults": {
+      "workspace": "/home/node/.openclaw/workspace",
+      "model": {
+        "primary": "ollama/qwen2.5:7b-instruct-q4_K_M"
+      },
+      "models": {
+        "ollama/qwen2.5:7b-instruct-q4_K_M": {}
+      },
+      "sandbox": {
+        "mode": "non-main",
+        "docker": {
+          "image": "openclaw-sandbox:bookworm-slim"
+        }
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://ollama:11434/v1",
+        "api": "openai-completions"
+      }
+    }
+  },
+  "gateway": {
+    "bind": "lan",
+    "auth": {
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}

@@ -14,6 +14,7 @@ import time
 import argparse
 import platform
 import sys
+import secrets
 
 def run_command(cmd, cwd=None):
     """Run a shell command and print it."""
@@ -190,6 +191,40 @@ def generate_searxng_secret_key():
         print("    $secretKey = -join ($randomBytes | ForEach-Object { \"{0:x2}\" -f $_ })")
         print("    (Get-Content searxng/settings.yml) -replace 'ultrasecretkey', $secretKey | Set-Content searxng/settings.yml")
 
+def prepare_moltbot_env():
+    """Ensure OPENCLAW_GATEWAY_TOKEN is set in the environment and persisted in .env."""
+    root_env_path = ".env"
+    token_key = "OPENCLAW_GATEWAY_TOKEN"
+
+    # Check if it's already in the environment
+    if os.environ.get(token_key):
+        return
+
+    # Check if it's in the root .env file
+    found_in_file = False
+    if os.path.exists(root_env_path):
+        with open(root_env_path, 'r') as f:
+            for line in f:
+                if line.startswith(f"{token_key}="):
+                    parts = line.split('=', 1)
+                    if len(parts) > 1:
+                        val = parts[1].strip()
+                        if val:
+                            os.environ[token_key] = val
+                            found_in_file = True
+                            break
+
+    if not found_in_file:
+        print(f"{token_key} not found. Generating a secure token...")
+        new_token = secrets.token_hex(32)
+        os.environ[token_key] = new_token
+
+        # Persist to .env if it exists
+        if os.path.exists(root_env_path):
+            with open(root_env_path, 'a') as f:
+                f.write(f"\n{token_key}={new_token}\n")
+            print(f"Persisted {token_key} to {root_env_path}")
+
 def check_and_fix_docker_compose_for_searxng():
     """Check and modify docker-compose.yml for SearXNG first run."""
     docker_compose_path = "docker-compose.yml"
@@ -267,10 +302,11 @@ def main():
     args = parser.parse_args()
 
     clone_supabase_repo()
-    prepare_supabase_env()
 
-    # Generate SearXNG secret key and check docker-compose.yml
+    # Generate secrets and check configuration
     generate_searxng_secret_key()
+    prepare_moltbot_env()
+    prepare_supabase_env()
     check_and_fix_docker_compose_for_searxng()
 
     stop_existing_containers(args.profile)
