@@ -36,6 +36,11 @@
     reverse_proxy moltbot:18789
 }
 
+# LobeChat
+{$LOBECHAT_HOSTNAME} {
+    reverse_proxy lobe-chat:3210
+}
+
 import /etc/caddy/addons/*.conf
 
 # # SearXNG

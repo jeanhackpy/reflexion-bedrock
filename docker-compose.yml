@@ -126,9 +126,6 @@ services:
           memory: 512M
     environment:
       - NEO4J_AUTH=${NEO4J_AUTH:-"neo4j/your_password"}
-      - NEO4J_server_memory_heap_initial__size=256m
-      - NEO4J_server_memory_heap_max__size=256m
-      - NEO4J_server_memory_pagecache_size=128m
     restart: always
 
   caddy:
@@ -156,6 +153,8 @@ services:
       - SEARXNG_HOSTNAME=${SEARXNG_HOSTNAME:-":8006"}
       - LANGFUSE_HOSTNAME=${LANGFUSE_HOSTNAME:-":8007"}
       - NEO4J_HOSTNAME=${NEO4J_HOSTNAME:-":8008"}
+      - MOLTBOT_HOSTNAME=${MOLTBOT_HOSTNAME:-":8009"}
+      - LOBECHAT_HOSTNAME=${LOBECHAT_HOSTNAME:-":8010"}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-internal}
     cap_drop:
       - ALL
@@ -205,6 +204,21 @@ services:
     volumes:
       - ./moltbot:/home/node/.openclaw
       - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  lobe-chat:
+    image: lobehub/lobe-chat:latest
+    container_name: lobe-chat
+    restart: unless-stopped
+    expose:
+      - 3210/tcp
+    environment:
+      - OLLAMA_PROXY_URL=http://ollama:11434
+      - OPENAI_PROXY_URL=http://moltbot:18789/v1
+      - OPENAI_API_KEY=${OPENCLAW_GATEWAY_TOKEN}
     deploy:
       resources:
         limits:
