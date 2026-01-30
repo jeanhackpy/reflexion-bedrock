@@ -12,7 +12,10 @@
 
 # Open WebUI
 {$WEBUI_HOSTNAME} {
-    reverse_proxy open-webui:8080
+    reverse_proxy open-webui:8080 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
 }
 
 
@@ -33,12 +36,18 @@
 
 # Moltbot
 {$MOLTBOT_HOSTNAME} {
-    reverse_proxy moltbot:18789
+    reverse_proxy moltbot:18789 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
 }
 
 # LobeChat
 {$LOBECHAT_HOSTNAME} {
-    reverse_proxy lobe-chat:3210
+    reverse_proxy lobe-chat:3210 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
 }
 
 import /etc/caddy/addons/*.conf
