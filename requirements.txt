@@ -1,0 +1,4 @@
+httpx
+python-dotenv
+pydantic
+requests # Kept for backward compatibility if needed by other scripts

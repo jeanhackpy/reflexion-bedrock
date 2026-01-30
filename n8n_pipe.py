@@ -2,40 +2,65 @@
 title: n8n Pipe Function
 author: Cole Medin
 author_url: https://www.youtube.com/@ColeMedin
-version: 0.1.0
+version: 0.2.0
 
-This module defines a Pipe class that utilizes N8N for an Agent
+This module defines a Pipe class that utilizes N8N for an Agent.
+Refactored for async performance and industry standards.
 """
 
-from typing import Optional, Callable, Awaitable
-from pydantic import BaseModel, Field
-import os
 import time
-import requests
+import httpx
+import logging
+from typing import Optional, Callable, Awaitable, Any, Union
+from pydantic import BaseModel, Field
 
-def extract_event_info(event_emitter) -> tuple[Optional[str], Optional[str]]:
-    if not event_emitter or not event_emitter.__closure__:
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def extract_event_info(event_emitter: Any) -> tuple[Optional[str], Optional[str]]:
+    """
+    Extracts chat_id and message_id from the event_emitter's closure.
+    This is a bit of a hack specific to Open WebUI's internal structure.
+    """
+    if not event_emitter or not hasattr(event_emitter, "__closure__") or not event_emitter.__closure__:
         return None, None
+
     for cell in event_emitter.__closure__:
-        if isinstance(request_info := cell.cell_contents, dict):
-            chat_id = request_info.get("chat_id")
-            message_id = request_info.get("message_id")
-            return chat_id, message_id
+        if hasattr(cell, "cell_contents"):
+            contents = cell.cell_contents
+            if isinstance(contents, dict):
+                chat_id = contents.get("chat_id")
+                message_id = contents.get("message_id")
+                if chat_id or message_id:
+                    return chat_id, message_id
     return None, None
 
 class Pipe:
     class Valves(BaseModel):
         n8n_url: str = Field(
-            default="https://n8n.[your domain].com/webhook/[your webhook URL]"
+            default="",
+            description="The URL of your n8n webhook."
         )
-        n8n_bearer_token: str = Field(default="...")
-        input_field: str = Field(default="chatInput")
-        response_field: str = Field(default="output")
+        n8n_bearer_token: str = Field(
+            default="",
+            description="Bearer token for n8n authentication."
+        )
+        input_field: str = Field(
+            default="chatInput",
+            description="The field name n8n expects for the user input."
+        )
+        response_field: str = Field(
+            default="output",
+            description="The field name n8n returns the response in."
+        )
         emit_interval: float = Field(
-            default=2.0, description="Interval in seconds between status emissions"
+            default=2.0,
+            description="Interval in seconds between status emissions."
         )
         enable_status_indicator: bool = Field(
-            default=True, description="Enable or disable status indicator emissions"
+            default=True,
+            description="Enable or disable status indicator emissions."
         )
 
     def __init__(self):
@@ -44,11 +69,10 @@ class Pipe:
         self.name = "N8N Pipe"
         self.valves = self.Valves()
         self.last_emit_time = 0
-        pass
 
     async def emit_status(
         self,
-        __event_emitter__: Callable[[dict], Awaitable[None]],
+        __event_emitter__: Optional[Callable[[dict], Awaitable[None]]],
         level: str,
         message: str,
         done: bool,
@@ -78,58 +102,66 @@ class Pipe:
         self,
         body: dict,
         __user__: Optional[dict] = None,
-        __event_emitter__: Callable[[dict], Awaitable[None]] = None,
-        __event_call__: Callable[[dict], Awaitable[dict]] = None,
-    ) -> Optional[dict]:
+        __event_emitter__: Optional[Callable[[dict], Awaitable[None]]] = None,
+        __event_call__: Optional[Callable[[dict], Awaitable[dict]]] = None,
+    ) -> Union[str, dict]:
+        if not self.valves.n8n_url:
+            return "Error: n8n_url is not configured in Valves."
+
         await self.emit_status(
-            __event_emitter__, "info", "/Calling N8N Workflow...", False
+            __event_emitter__, "info", "Calling N8N Workflow...", False
         )
+
         chat_id, _ = extract_event_info(__event_emitter__)
         messages = body.get("messages", [])
 
-        # Verify a message is available
-        if messages:
-            question = messages[-1]["content"]
-            try:
-                # Invoke N8N workflow
-                headers = {
-                    "Authorization": f"Bearer {self.valves.n8n_bearer_token}",
-                    "Content-Type": "application/json",
-                }
-                payload = {"sessionId": f"{chat_id}"}
-                payload[self.valves.input_field] = question
-                response = requests.post(
-                    self.valves.n8n_url, json=payload, headers=headers
-                )
-                if response.status_code == 200:
-                    n8n_response = response.json()[self.valves.response_field]
-                else:
-                    raise Exception(f"Error: {response.status_code} - {response.text}")
+        if not messages:
+            error_msg = "No messages found in the request body"
+            await self.emit_status(__event_emitter__, "error", error_msg, True)
+            return error_msg
 
-                # Set assitant message with chain reply
-                body["messages"].append({"role": "assistant", "content": n8n_response})
-            except Exception as e:
-                await self.emit_status(
-                    __event_emitter__,
-                    "error",
-                    f"Error during sequence execution: {str(e)}",
-                    True,
+        question = messages[-1]["content"]
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.valves.n8n_bearer_token}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "sessionId": chat_id or "default_session",
+                self.valves.input_field: question
+            }
+
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(
+                    self.valves.n8n_url,
+                    json=payload,
+                    headers=headers
                 )
-                return {"error": str(e)}
-        # If no message is available alert user
-        else:
-            await self.emit_status(
-                __event_emitter__,
-                "error",
-                "No messages found in the request body",
-                True,
-            )
-            body["messages"].append(
-                {
-                    "role": "assistant",
-                    "content": "No messages found in the request body",
-                }
-            )
+                response.raise_for_status()
+                result = response.json()
+
+                # Check if result is a list (n8n often returns a list)
+                if isinstance(result, list) and len(result) > 0:
+                    result = result[0]
+
+                n8n_response = result.get(self.valves.response_field, "No response from n8n.")
+
+            # Append the response to messages to maintain history if needed by the UI
+            # Some UIs expect the pipe to return the whole body, some just the string
+            # In Open WebUI, returning the string replaces the assistant response
+            body["messages"].append({"role": "assistant", "content": n8n_response})
+
+        except httpx.HTTPStatusError as e:
+            error_msg = f"HTTP Error {e.response.status_code}: {e.response.text}"
+            logger.error(error_msg)
+            await self.emit_status(__event_emitter__, "error", error_msg, True)
+            return error_msg
+        except Exception as e:
+            error_msg = f"Error during sequence execution: {str(e)}"
+            logger.exception(error_msg)
+            await self.emit_status(__event_emitter__, "error", error_msg, True)
+            return error_msg
 
         await self.emit_status(__event_emitter__, "info", "Complete", True)
         return n8n_response
