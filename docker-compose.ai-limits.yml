@@ -1,0 +1,71 @@
+services:
+  # --- AI Services ---
+  n8n:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 400M
+
+  ollama-cpu:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 3G
+
+  ollama-gpu:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 3G
+
+  ollama-gpu-amd:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 3G
+
+  open-webui:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  qdrant:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  neo4j:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 400M
+
+  moltbot:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  lobe-chat:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 400M
+
+  searxng:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M

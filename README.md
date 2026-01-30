@@ -75,7 +75,12 @@ cd local-ai-packaged
 Before running the services, you need to set up your environment variables for Supabase following their [self-hosting guide](https://supabase.com/docs/guides/self-hosting/docker#securing-your-services).
 
 1. Make a copy of `.env.example` and rename it to `.env` in the root directory of the project
-2. Set the following required environment variables:
+2. **(Optional)** Manually set environment variables in `.env`.
+
+   > [!TIP]
+   > The `start_services.py` script will automatically generate secure random values for any missing or default secrets in your `.env` file for Supabase and Moltbot. You only need to manually set them if you have specific values you want to use.
+
+   Required sections for manual configuration:
    ```bash
    ############
    # N8N Configuration
@@ -84,7 +89,7 @@ Before running the services, you need to set up your environment variables for S
    N8N_USER_MANAGEMENT_JWT_SECRET=
 
    ############
-   # Supabase Secrets
+   # Supabase Secrets (Auto-generated if left empty)
    ############
    POSTGRES_PASSWORD=
    JWT_SECRET=
@@ -92,26 +97,12 @@ Before running the services, you need to set up your environment variables for S
    SERVICE_ROLE_KEY=
    DASHBOARD_USERNAME=
    DASHBOARD_PASSWORD=
-   POOLER_TENANT_ID=
 
    ############
    # Neo4j Secrets
    ############   
    NEO4J_AUTH=
-
-   ############
-   # Langfuse credentials
-   ############
-
-   CLICKHOUSE_PASSWORD=
-   MINIO_ROOT_PASSWORD=
-   LANGFUSE_SALT=
-   NEXTAUTH_SECRET=
-   ENCRYPTION_KEY=  
    ```
-
-> [!IMPORTANT]
-> Make sure to generate secure random values for all secrets. Never use the example values in production.
 
 3. Set the following environment variables if deploying to production, otherwise leave commented:
    ```bash
@@ -131,7 +122,12 @@ Before running the services, you need to set up your environment variables for S
 
 ---
 
-The project includes a `start_services.py` script that handles starting both the Supabase and local AI services. The script accepts a `--profile` flag to specify which GPU configuration to use.
+The project includes a `start_services.py` script that handles the entire bootstrapping process:
+- **Security:** Auto-generates cryptographically secure secrets for Supabase and Moltbot.
+- **Resource Management:** Automatically applies CPU and Memory limits from `docker-compose.resource-limits.yml` to ensure stability on smaller VPS instances.
+- **Orchestration:** Sequential startup of the database stack before the AI stack.
+
+The script accepts a `--profile` flag to specify which GPU configuration to use.
 
 ### For Nvidia GPU users
 
