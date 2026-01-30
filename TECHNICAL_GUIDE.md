@@ -42,11 +42,22 @@ Services are connected via a shared Docker network. Caddy handles incoming traff
 | Moltbot | 18789 | :8009 |
 | LobeChat | 3210 | :8010 |
 
+## Resource Management
+Given the high density of services (20+ containers), the package includes a `docker-compose.resource-limits.yml` file. This file enforces strict CPU and Memory caps on every service to ensure stability on smaller VPS instances (e.g., 2 vCPU, 8GB RAM).
+
+- **Ollama:** Capped at 3GB RAM and 1.5 vCPU to allow heavy inference without crashing the host.
+- **Supabase DB:** Capped at 768MB RAM.
+- **Microservices:** Most support services (Auth, Rest, Kong) are capped at 128MB RAM and 0.1 vCPU.
+
+To adjust these limits, modify `docker-compose.resource-limits.yml` before running `start_services.py`.
+
 ## Security Best Practices
-1. **Secret Management:** Always use unique, strong passwords and keys in the `.env` file. Never commit your `.env` file to version control.
-2. **Access Control:** When deploying to a public environment, ensure that only necessary ports (80/443) are exposed and use the `public` environment profile in `start_services.py`.
-3. **Database Security:** Avoid using special characters like `@` in the Postgres password to prevent connection string parsing issues.
-4. **Local Execution:** By default, all AI processing happens locally on your hardware, ensuring data privacy.
+1. **Automated Secret Hardening:** The `start_services.py` script automatically detects insecure default secrets (like those in `.env.example`) and replaces them with secure random values on the first run.
+2. **Secret Management:** Always use unique, strong passwords. Never commit your `.env` file to version control.
+3. **Access Control:** Use the `public` environment profile to expose only ports 80/443 via Caddy, keeping all other service ports internal to the Docker network.
+4. **Docker Socket Security:** Some services (Moltbot, Analytics) require access to `/var/run/docker.sock`. Use this with caution and ensure these services are not exposed directly to the internet.
+5. **Database Security:** Avoid using special characters like `@` in the Postgres password to prevent connection string parsing issues.
+6. **Local Execution:** All AI processing happens locally by default, ensuring your data never leaves your infrastructure.
 
 ## Development & Bootstrapping
 The `start_services.py` script automates the initialization of the stack:
